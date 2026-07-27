@@ -3,146 +3,364 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Katalog & Stok Plastik</title>
-  <!-- Tailwind CSS CDN untuk Tampilan Modern & Responsive -->
+  <title>Aplikasi POS Toko Plastik</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans min-h-screen p-3 md:p-6">
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-12">
 
-  <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+  <!-- Header & Navigation -->
+  <header class="bg-blue-900 text-white sticky top-0 z-50 shadow-md">
+    <div class="max-w-4xl mx-auto p-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold">🛒 Kasir & Stok Plastik</h1>
+        <p class="text-xs text-blue-200">Sistem POS Terintegrasi Google Sheets</p>
+      </div>
+      <span id="cartCount" class="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+        Keranjang: 0
+      </span>
+    </div>
     
-    <!-- Header App -->
-    <div class="bg-blue-900 p-5 text-white">
-      <h1 class="text-xl font-bold tracking-wide">📦 Database Stok & Harga Plastik</h1>
-      <p class="text-xs text-blue-200 mt-1">Cek Modal, Harga Jual, Untung, dan Stok secara realtime</p>
+    <!-- Tab Menu -->
+    <div class="flex border-t border-blue-800 bg-blue-950 text-xs font-semibold">
+      <button onclick="switchTab('kasir')" id="tab-kasir" class="flex-1 py-3 text-center border-b-2 border-emerald-400 text-white">
+        🛍️ Kasir (POS)
+      </button>
+      <button onclick="switchTab('katalog')" id="tab-katalog" class="flex-1 py-3 text-center text-blue-300">
+        📦 Stok & Catalog
+      </button>
+      <button onclick="switchTab('tambah')" id="tab-tambah" class="flex-1 py-3 text-center text-blue-300">
+        ➕ Tambah Barang
+      </button>
     </div>
+  </header>
 
-    <div class="p-4 md:p-6">
-      <!-- Search Bar & Filter -->
-      <div class="relative mb-5">
-        <input type="text" id="searchInput" onkeyup="filterData()" 
-               placeholder="Cari barang (contoh: PE, 12x22, Kharisma, Kantong)..." 
-               class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition text-sm">
-        <span class="absolute left-3 top-3.5 text-slate-400">🔍</span>
+  <main class="max-w-4xl mx-auto p-4">
+
+    <!-- ================= TAB 1: KASIR (POS) ================= -->
+    <section id="sec-kasir" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- Pilih Produk -->
+        <div class="md:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+          <input type="text" id="searchKasir" onkeyup="filterKasir()" placeholder="Cari nama/ukuran barang..." 
+                 class="w-full p-2.5 bg-slate-50 border rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          
+          <div id="gridKasir" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[450px] overflow-y-auto"></div>
+        </div>
+
+        <!-- Keranjang & Checkout -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h2 class="font-bold border-b pb-2 mb-3 text-slate-800">Ringkasan Belanja</h2>
+            <div id="cartItems" class="space-y-2 max-h-[280px] overflow-y-auto text-xs">
+              <p class="text-slate-400 text-center py-4">Keranjang masih kosong</p>
+            </div>
+          </div>
+
+          <div class="border-t pt-3 mt-3">
+            <div class="flex justify-between font-bold text-sm mb-3">
+              <span>Total:</span>
+              <span id="cartTotal" class="text-emerald-600">Rp 0</span>
+            </div>
+            <button onclick="checkout()" id="btnCheckout" disabled 
+                    class="w-full py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm disabled:bg-slate-300 hover:bg-emerald-700 transition">
+              Proses Transaksi
+            </button>
+          </div>
+        </div>
+
       </div>
+    </section>
 
-      <!-- Indicator Loading -->
-      <div id="loading" class="flex flex-col items-center justify-center py-10 space-y-3">
-        <div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-sm text-slate-500 font-medium">Memuat data dari Google Sheets...</p>
-      </div>
+    <!-- ================= TAB 2: KATALOG & STOK ================= -->
+    <section id="sec-katalog" class="hidden space-y-3">
+      <input type="text" id="searchKatalog" onkeyup="filterKatalog()" placeholder="Filter stok & harga..." 
+             class="w-full p-2.5 bg-white border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div id="listKatalog" class="space-y-2"></div>
+    </section>
 
-      <!-- Container Daftar Barang -->
-      <div id="itemList" class="space-y-3"></div>
-    </div>
-  </div>
+    <!-- ================= TAB 3: TAMBAH BARANG BARU ================= -->
+    <section id="sec-tambah" class="hidden max-w-lg mx-auto bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+      <h2 class="font-bold text-base border-b pb-2 mb-4 text-slate-800">Form Tambah Produk Baru</h2>
+      
+      <form id="formTambahBarang" onsubmit="handleTambahBarang(event)" class="space-y-3 text-xs font-medium">
+        <div>
+          <label class="block mb-1 text-slate-600">Jenis Plastik</label>
+          <select id="inpJenis" class="w-full p-2.5 border rounded-lg bg-slate-50" required>
+            <option value="Kantong">Kantong</option>
+            <option value="Plastik PE">Plastik PE</option>
+            <option value="Plastik PP">Plastik PP</option>
+            <option value="Plastik HD">Plastik HD</option>
+            <option value="Mika / Cup">Mika / Cup</option>
+            <option value="Lainnya">Lainnya</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block mb-1 text-slate-600">Nama Barang</label>
+          <input type="text" id="inpNama" placeholder="cth: Kharisma / Sampah Padi" class="w-full p-2.5 border rounded-lg" required>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block mb-1 text-slate-600">Ukuran</label>
+            <input type="text" id="inpUkuran" placeholder="cth: 15x30 / 1 Cup" class="w-full p-2.5 border rounded-lg" required>
+          </div>
+          <div>
+            <label class="block mb-1 text-slate-600">Satuan Jual</label>
+            <select id="inpSatuan" class="w-full p-2.5 border rounded-lg bg-slate-50" required>
+              <option value="Pack">Pack</option>
+              <option value="Kg">Kg</option>
+              <option value="Bal">Bal</option>
+              <option value="Pcs">Pcs</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block mb-1 text-slate-600">Harga Modal (Rp)</label>
+            <input type="number" id="inpModal" placeholder="8250" class="w-full p-2.5 border rounded-lg" required>
+          </div>
+          <div>
+            <label class="block mb-1 text-slate-600">Harga Jual (Rp)</label>
+            <input type="number" id="inpHargaJual" placeholder="10000" class="w-full p-2.5 border rounded-lg" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block mb-1 text-slate-600">Stok Awal</label>
+            <input type="number" id="inpStok" placeholder="50" class="w-full p-2.5 border rounded-lg" required>
+          </div>
+          <div>
+            <label class="block mb-1 text-slate-600">Stok Minimum (Alert)</label>
+            <input type="number" id="inpStokMin" placeholder="10" value="5" class="w-full p-2.5 border rounded-lg" required>
+          </div>
+        </div>
+
+        <button type="submit" id="btnSimpan" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition mt-4">
+          💾 Simpan Barang ke Database
+        </button>
+      </form>
+    </section>
+
+  </main>
 
   <script>
     // =========================================================
-    // PASTE URL GOOGLE APPS SCRIPT ANDA DI SINI
+    // ISI DENGAN URL APPS SCRIPT DEPLOYMENT ANDA
     // =========================================================
-    const API_URL = "https://script.google.com/macros/s/AKfycbx_ySVl1wIzuMkMjwXgiLEZUeGsr8kjSZFP5CYixG-lm6qvJrQeYhQRU8GADvAlqZdI/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbxkWS2GhOxYEDSen1_CO9Kb1ahsQyutHFgXes-UMVskTrI6XnXCLW2tqvEH8VchNHLJ/exec";
 
     let masterData = [];
+    let cart = [];
 
-    // Fungsi Mengambil Data dari API
     async function loadData() {
-      const loadingEl = document.getElementById('loading');
       try {
-        const response = await fetch(API_URL, { redirect: 'follow' });
-        const data = await response.json();
-
-        if (data.status === "error") {
-          loadingEl.innerHTML = `<p class="text-red-500 text-sm font-semibold">Error Server: ${data.message}</p>`;
-          return;
+        const res = await fetch(API_URL);
+        const json = await res.json();
+        if(json.status === "success") {
+          masterData = json.data;
+          renderKasir(masterData);
+          renderKatalog(masterData);
         }
-
-        masterData = data;
-        loadingEl.classList.add('hidden');
-        renderData(masterData);
-
       } catch (err) {
-        loadingEl.innerHTML = `
-          <div class="text-center text-red-500 p-4 border border-red-200 bg-red-50 rounded-xl">
-            <p class="font-bold text-sm">Gagal Terhubung ke Database</p>
-            <p class="text-xs mt-1 text-red-400">Pastikan URL Apps Script benar dan akses sudah 'Anyone'.</p>
-          </div>`;
-        console.error("Fetch Error:", err);
+        alert("Gagal terhubung ke database!");
       }
     }
 
-    // Fungsi Menampilkan Data ke HTML
-    function renderData(items) {
-      const container = document.getElementById('itemList');
-      container.innerHTML = '';
+    // --- TAB SWITCHER ---
+    function switchTab(tab) {
+      ['kasir', 'katalog', 'tambah'].forEach(t => {
+        document.getElementById(`sec-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).className = "flex-1 py-3 text-center text-blue-300";
+      });
+      document.getElementById(`sec-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = "flex-1 py-3 text-center border-b-2 border-emerald-400 text-white";
+    }
 
-      if (items.length === 0) {
-        container.innerHTML = `<p class="text-center text-slate-400 py-6 text-sm">Barang tidak ditemukan.</p>`;
-        return;
-      }
-
-      items.forEach(item => {
-        const stok = Number(item.Stok_Saat_Ini) || 0;
-        const minStok = Number(item.Stok_Minimum) || 0;
-        const modal = Number(item.Modal) || 0;
-        const jual = Number(item.Harga_Jual) || 0;
-        const untung = Number(item.Keuntungan) || (jual - modal);
-        
-        const isMenipis = stok <= minStok;
-
-        const card = document.createElement('div');
-        card.className = `p-4 rounded-xl border transition-all ${
-          isMenipis ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200 hover:border-blue-400'
-        }`;
-        
-        card.innerHTML = `
-          <div class="flex justify-between items-start gap-2">
-            <div>
-              <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider mb-1">
-                ${item.Jenis || 'Umum'}
-              </span>
-              <h2 class="font-bold text-slate-900 text-base leading-tight">
-                ${item.Nama_Barang} ${item.Ukuran ? `(${item.Ukuran})` : ''}
-              </h2>
-              <p class="text-xs text-slate-500 mt-1">
-                Modal: <span class="font-semibold text-slate-700">Rp ${modal.toLocaleString('id-ID')}</span> / ${item.Satuan || 'Pcs'}
-              </p>
-            </div>
-            
-            <div class="text-right flex-shrink-0">
-              <p class="text-base font-extrabold text-emerald-600">Rp ${jual.toLocaleString('id-ID')}</p>
-              <p class="text-[11px] font-medium text-slate-500 mt-0.5">
-                Untung: <span class="text-blue-600 font-bold">Rp ${untung.toLocaleString('id-ID')}</span>
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-3 pt-2.5 border-t border-slate-100 flex justify-between items-center text-xs">
-            <div class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full ${isMenipis ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}"></span>
-              <span class="font-semibold ${isMenipis ? 'text-amber-700 font-bold' : 'text-slate-600'}">
-                Stok: ${stok} ${item.Satuan || ''} ${isMenipis ? '(Menipis!)' : ''}
-              </span>
+    // --- RENDER KASIR ---
+    function renderKasir(data) {
+      const el = document.getElementById('gridKasir');
+      el.innerHTML = '';
+      data.forEach(item => {
+        el.innerHTML += `
+          <div onclick="addToCart('${item.ID_Barang}')" class="p-2.5 bg-slate-50 border rounded-lg hover:border-blue-500 cursor-pointer transition">
+            <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">${item.Jenis}</span>
+            <h3 class="font-bold text-xs mt-1">${item.Nama_Barang} ${item.Ukuran}</h3>
+            <div class="flex justify-between items-center mt-2 text-xs">
+              <span class="font-bold text-emerald-600">Rp ${Number(item.Harga_Jual).toLocaleString()}</span>
+              <span class="text-[10px] text-slate-500">Stok: ${item.Stok_Saat_Ini}</span>
             </div>
           </div>
         `;
-        container.appendChild(card);
       });
     }
 
-    // Fungsi Filter Live Search
-    function filterData() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = masterData.filter(item => {
-        const nama = (item.Nama_Barang || '').toLowerCase();
-        const jenis = (item.Jenis || '').toLowerCase();
-        const ukuran = (item.Ukuran || '').toLowerCase();
-        return nama.includes(query) || jenis.includes(query) || ukuran.includes(query);
-      });
-      renderData(filtered);
+    function addToCart(id) {
+      const item = masterData.find(x => x.ID_Barang === id);
+      if(!item || item.Stok_Saat_Ini <= 0) return alert("Stok habis!");
+
+      const inCart = cart.find(x => x.id_barang === id);
+      if(inCart) {
+        if(inCart.jumlah < item.Stok_Saat_Ini) inCart.jumlah++;
+      } else {
+        cart.push({
+          id_barang: item.ID_Barang,
+          nama_barang: `${item.Nama_Barang} ${item.Ukuran}`,
+          harga_satuan: Number(item.Harga_Jual),
+          satuan: item.Satuan,
+          jumlah: 1
+        });
+      }
+      updateCartUI();
     }
 
-    // Jalankan pertama kali
+    function updateCartUI() {
+      const el = document.getElementById('cartItems');
+      const totalEl = document.getElementById('cartTotal');
+      const countEl = document.getElementById('cartCount');
+      const btn = document.getElementById('btnCheckout');
+
+      if(cart.length === 0) {
+        el.innerHTML = '<p class="text-slate-400 text-center py-4">Keranjang masih kosong</p>';
+        totalEl.innerText = "Rp 0";
+        countEl.innerText = "Keranjang: 0";
+        btn.disabled = true;
+        return;
+      }
+
+      el.innerHTML = '';
+      let total = 0;
+      let qtyTotal = 0;
+
+      cart.forEach((c, idx) => {
+        const sub = c.harga_satuan * c.jumlah;
+        total += sub;
+        qtyTotal += c.jumlah;
+        el.innerHTML += `
+          <div class="flex justify-between items-center border-b pb-1.5">
+            <div>
+              <p class="font-bold">${c.nama_barang}</p>
+              <p class="text-slate-500">Rp ${c.harga_satuan.toLocaleString()} x ${c.jumlah}</p>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="font-bold text-emerald-600">Rp ${sub.toLocaleString()}</span>
+              <button onclick="removeItem(${idx})" class="text-red-500 ml-1 font-bold">×</button>
+            </div>
+          </div>
+        `;
+      });
+
+      totalEl.innerText = `Rp ${total.toLocaleString()}`;
+      countEl.innerText = `Keranjang: ${qtyTotal}`;
+      btn.disabled = false;
+    }
+
+    function removeItem(idx) {
+      cart.splice(idx, 1);
+      updateCartUI();
+    }
+
+    async function checkout() {
+      if(!confirm("Proses transaksi ini?")) return;
+      const btn = document.getElementById('btnCheckout');
+      btn.disabled = true;
+      btn.innerText = "Memproses...";
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "CHECKOUT", items: cart })
+        });
+        const json = await res.json();
+        if(json.status === "success") {
+          alert("Transaksi Berhasil!");
+          cart = [];
+          updateCartUI();
+          loadData();
+        }
+      } catch (err) {
+        alert("Gagal memproses transaksi!");
+      } finally {
+        btn.innerText = "Proses Transaksi";
+      }
+    }
+
+    // --- RENDER KATALOG ---
+    function renderKatalog(data) {
+      const el = document.getElementById('listKatalog');
+      el.innerHTML = '';
+      data.forEach(item => {
+        const isMenipis = item.Stok_Saat_Ini <= item.Stok_Minimum;
+        el.innerHTML += `
+          <div class="p-3 bg-white border rounded-xl flex justify-between items-center text-xs shadow-sm">
+            <div>
+              <span class="font-bold bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded">${item.Jenis}</span>
+              <h3 class="font-bold text-sm text-slate-800 mt-0.5">${item.Nama_Barang} ${item.Ukuran}</h3>
+              <p class="text-slate-500">Modal: Rp ${Number(item.Modal).toLocaleString()} | Untung: Rp ${Number(item.Keuntungan).toLocaleString()}</p>
+            </div>
+            <div class="text-right">
+              <p class="font-extrabold text-sm text-emerald-600">Rp ${Number(item.Harga_Jual).toLocaleString()}</p>
+              <p class="font-bold ${isMenipis ? 'text-red-500' : 'text-slate-600'}">Stok: ${item.Stok_Saat_Ini} ${item.Satuan}</p>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // --- HANDLER TAMBAH BARANG ---
+    async function handleTambahBarang(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSimpan');
+      btn.disabled = true;
+      btn.innerText = "Menyimpan...";
+
+      const payload = {
+        action: "ADD_PRODUCT",
+        data: {
+          jenis: document.getElementById('inpJenis').value,
+          nama_barang: document.getElementById('inpNama').value,
+          ukuran: document.getElementById('inpUkuran').value,
+          satuan: document.getElementById('inpSatuan').value,
+          modal: document.getElementById('inpModal').value,
+          harga_jual: document.getElementById('inpHargaJual').value,
+          stok: document.getElementById('inpStok').value,
+          stok_min: document.getElementById('inpStokMin').value
+        }
+      };
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if(json.status === "success") {
+          alert("Barang Baru Berhasil Ditambahkan!");
+          document.getElementById('formTambahBarang').reset();
+          switchTab('katalog');
+          loadData();
+        }
+      } catch (err) {
+        alert("Gagal menambahkan barang!");
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "💾 Simpan Barang ke Database";
+      }
+    }
+
+    function filterKasir() {
+      const q = document.getElementById('searchKasir').value.toLowerCase();
+      renderKasir(masterData.filter(x => `${x.Nama_Barang} ${x.Ukuran}`.toLowerCase().includes(q)));
+    }
+
+    function filterKatalog() {
+      const q = document.getElementById('searchKatalog').value.toLowerCase();
+      renderKatalog(masterData.filter(x => `${x.Nama_Barang} ${x.Ukuran} ${x.Jenis}`.toLowerCase().includes(q)));
+    }
+
     loadData();
   </script>
 </body>
