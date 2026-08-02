@@ -159,6 +159,19 @@
 
     <!-- ================= TAB 4: LAPORAN PENJUALAN ================= -->
     <section id="sec-laporan" class="hidden space-y-4">
+      
+      <!-- Filter Periode Laporan -->
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <span class="text-xs font-bold text-slate-700">🗓️ Periode Laporan:</span>
+        <div class="flex gap-1 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+          <button onclick="setFilterLaporan('hari')" id="btnFilterHari" class="px-3 py-1.5 rounded-md bg-white shadow-sm text-blue-600">Hari Ini</button>
+          <button onclick="setFilterLaporan('bulan')" id="btnFilterBulan" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-blue-600">Bulan Ini</button>
+          <button onclick="setFilterLaporan('tahun')" id="btnFilterTahun" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-blue-600">Tahun Ini</button>
+          <button onclick="setFilterLaporan('semua')" id="btnFilterSemua" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-blue-600">Semua</button>
+        </div>
+      </div>
+
+      <!-- Ringkasan Statistik -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p class="text-xs text-slate-500 font-medium">Total Omset</p>
@@ -174,8 +187,9 @@
         </div>
       </div>
 
+      <!-- Riwayat Transaksi -->
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <h3 class="font-bold text-xs text-slate-700 border-b pb-2 mb-3">Riwayat Transaksi Terakhir</h3>
+        <h3 class="font-bold text-xs text-slate-700 border-b pb-2 mb-3">Riwayat Transaksi</h3>
         <div id="listTransaksi" class="space-y-2 max-h-[350px] overflow-y-auto text-xs">
           <p class="text-slate-400 text-center py-4">Belum ada riwayat transaksi</p>
         </div>
@@ -207,7 +221,9 @@
     const db = getFirestore(app);
 
     let masterProducts = [];
+    let masterTransactions = [];
     let cart = [];
+    let activeFilter = 'hari'; // Default filter laporan
 
     // --- REALTIME LISTENERS FIRESTORE ---
     
@@ -235,22 +251,59 @@
     // 2. Listen Koleksi Transactions
     const trxQuery = query(collection(db, "transactions"), orderBy("created_at", "desc"));
     onSnapshot(trxQuery, (snapshot) => {
+      masterTransactions = [];
+      snapshot.forEach((docSnap) => {
+        masterTransactions.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      renderLaporan();
+    });
+
+    // --- RENDER LAPORAN (FILTER HARIAN/BULANAN/TAHUNAN) ---
+    window.setFilterLaporan = function(mode) {
+      activeFilter = mode;
+      
+      // Highlight tombol
+      ['hari', 'bulan', 'tahun', 'semua'].forEach(m => {
+        const btn = document.getElementById(`btnFilter${m.charAt(0).toUpperCase() + m.slice(1)}`);
+        if(m === mode) {
+          btn.className = "px-3 py-1.5 rounded-md bg-white shadow-sm text-blue-600 font-bold";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-md text-slate-600 hover:text-blue-600 font-semibold";
+        }
+      });
+
+      renderLaporan();
+    };
+
+    function renderLaporan() {
+      const now = new Date();
+      let filteredTrx = masterTransactions.filter(t => {
+        if (!t.created_at) return false;
+        const trxDate = new Date(t.created_at.seconds * 1000);
+
+        if (activeFilter === 'hari') {
+          return trxDate.toDateString() === now.toDateString();
+        } else if (activeFilter === 'bulan') {
+          return trxDate.getMonth() === now.getMonth() && trxDate.getFullYear() === now.getFullYear();
+        } else if (activeFilter === 'tahun') {
+          return trxDate.getFullYear() === now.getFullYear();
+        }
+        return true; // Mode 'semua'
+      });
+
       let totalOmset = 0;
       let totalUntung = 0;
       let trxListHtml = '';
-      let count = snapshot.size;
 
-      snapshot.forEach((docSnap) => {
-        const t = docSnap.data();
+      filteredTrx.forEach((t) => {
         totalOmset += t.total_bayar || 0;
         totalUntung += t.total_keuntungan || 0;
-
         const dateStr = t.created_at ? new Date(t.created_at.seconds * 1000).toLocaleString('id-ID') : '-';
 
         trxListHtml += `
           <div class="p-2.5 bg-slate-50 border rounded-lg flex justify-between items-center">
             <div>
-              <p class="font-bold text-slate-800">${t.id_transaksi || docSnap.id}</p>
+              <p class="font-bold text-slate-800">${t.id_transaksi || t.id}</p>
               <p class="text-[10px] text-slate-500">${dateStr} | ${t.items ? t.items.length : 0} Jenis Item</p>
             </div>
             <div class="text-right">
@@ -263,9 +316,9 @@
 
       document.getElementById('statOmset').innerText = `Rp ${totalOmset.toLocaleString()}`;
       document.getElementById('statUntung').innerText = `Rp ${totalUntung.toLocaleString()}`;
-      document.getElementById('statTrxCount').innerText = `${count} Transaksi`;
-      document.getElementById('listTransaksi').innerHTML = trxListHtml || '<p class="text-slate-400 text-center py-4">Belum ada transaksi</p>';
-    });
+      document.getElementById('statTrxCount').innerText = `${filteredTrx.length} Transaksi`;
+      document.getElementById('listTransaksi').innerHTML = trxListHtml || '<p class="text-slate-400 text-center py-4">Tidak ada transaksi pada periode ini</p>';
+    }
 
     // --- RENDER KASIR ---
     window.renderKasir = function(data) {
@@ -372,7 +425,6 @@
           let totalModal = 0;
           let itemsPayload = [];
 
-          // 1. Baca dan potong stok
           for (const item of cart) {
             const productRef = doc(db, "products", item.id_doc);
             const sfDoc = await transaction.get(productRef);
@@ -384,7 +436,6 @@
               throw `Stok ${item.nama_barang} tidak mencukupi! (Sisa: ${currentStok})`;
             }
 
-            // Update stok baru
             transaction.update(productRef, { 
               stok_saat_ini: currentStok - item.jumlah,
               updated_at: serverTimestamp()
@@ -406,7 +457,6 @@
             });
           }
 
-          // 2. Simpan Dokumen Transaksi baru
           const newTrxRef = doc(collection(db, "transactions"));
           transaction.set(newTrxRef, {
             id_transaksi: "TRX-" + Date.now(),
@@ -461,7 +511,7 @@
       });
     };
 
-    // --- FUNGSI HAPUS BARANG FROM FIRESTORE ---
+    // --- FUNGSI HAPUS BARANG ---
     window.hapusBarang = async function(id, namaBarang) {
       if(!confirm(`Apakah Anda yakin ingin menghapus "${namaBarang}" dari database?`)) return;
 
